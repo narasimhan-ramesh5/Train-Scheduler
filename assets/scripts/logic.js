@@ -77,33 +77,37 @@ $(document).ready(function(){
 		var now = moment();
 		var minutesRemaining = 0;
 		var frequency = 0;
-		var nextArrival, nextArrivalFormatted;
+		var nextArrival, nextArrivalMilliseconds, nextArrivalFormatted;
 		var roundUp = 0;
-
-		if(now.seconds() || now.milliseconds()){
-			roundUp = 1;
-		}
-
-		console.log("START INTERVAL");
 		
-		// Iterate through all the trains and print minutes remaining
+		// Iterate through all the trains update minutes remaining 
 		$("#train-schedule-table > tbody > tr > td").each(function(){
 			if($(this).hasClass("frequency-cell")){
 				frequency = parseInt($(this).text());
 			}
 
+			// Get the next train arrival time in milliseconds, which
+			// is stored as a user-defined attribute in the table.
+			// (The text is just the HH:mm formatted time)
 			if($(this).hasClass("next-arrival-cell")){
 				console.log($(this).text());
-				nextArrival = $(this).text();
-				// Compute new minutes remaining based on current time
-				nextArrival = moment(today+" "+nextArrival);
+
+				nextArrivalMilliseconds = parseInt($(this).attr("next-arrival-val"));
+				if(nextArrivalMilliseconds){
+					console.log("Next arrival in milliseconds "+nextArrivalMilliseconds);
+				}
+
+				nextArrival = moment(nextArrivalMilliseconds);
 				console.log(nextArrival.format());
 
+				// Compute new minutes remaining based on current time
 				// If minutes remaining is zero, update to next occurrence
 				minutesRemaining = nextArrival.diff(now, "minutes") + roundUp;
-				if(minutesRemaining <= 1){
+				if(minutesRemaining <= 0){
 					minutesRemaining += frequency;
 					nextArrival.add(minutesRemaining, "minutes");
+					console.log("Next Arrival at "+nextArrival.format());
+
 					nextArrivalFormatted = nextArrival.format("HH:mm");
 					$(this).text(nextArrivalFormatted);
 				}
@@ -188,6 +192,7 @@ $(document).ready(function(){
 
 		nextArrivalCell = $("<td>");
 		nextArrivalCell.text(nextArrivalFormatted);
+		nextArrivalCell.attr("next-arrival-val",nextArrival.valueOf());
 		nextArrivalCell.addClass("next-arrival-cell");
 
 		minsRemCell = $("<td>");
