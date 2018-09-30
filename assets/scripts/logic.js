@@ -4,6 +4,9 @@
 
 $(document).ready(function(){
 
+	var timerHandle = 0;
+	var timerRunning = false;
+
 	// Initialize Firebase
 	var config = {
     apiKey: "AIzaSyDV_xgJtoBrvJhf2sWGyO_SzsH66YTg4cs",
@@ -66,6 +69,58 @@ $(document).ready(function(){
 	});
 
 	/**
+	 * Periodic callback function to update time remaining
+	 */
+	function refreshTimeRemaining(){
+
+		var today = (new Date()).toLocaleDateString();
+		var now = moment();
+		var minutesRemaining = 0;
+		var frequency = 0;
+		var nextArrival, nextArrivalFormatted;
+		var roundUp = 0;
+
+		if(now.seconds() || now.milliseconds()){
+			roundUp = 1;
+		}
+
+		console.log("START INTERVAL");
+		
+		// Iterate through all the trains and print minutes remaining
+		$("#train-schedule-table > tbody > tr > td").each(function(){
+			if($(this).hasClass("frequency-cell")){
+				frequency = parseInt($(this).text());
+			}
+
+			if($(this).hasClass("next-arrival-cell")){
+				console.log($(this).text());
+				nextArrival = $(this).text();
+				// Compute new minutes remaining based on current time
+				nextArrival = moment(today+" "+nextArrival);
+				console.log(nextArrival.format());
+
+				// If minutes remaining is zero, update to next occurrence
+				minutesRemaining = nextArrival.diff(now, "minutes") + roundUp;
+				if(minutesRemaining <= 1){
+					minutesRemaining += frequency;
+					nextArrival.add(minutesRemaining, "minutes");
+					nextArrivalFormatted = nextArrival.format("HH:mm");
+					$(this).text(nextArrivalFormatted);
+				}
+			}
+
+			if($(this).hasClass("minutes-remaining-cell")){
+				$(this).text(minutesRemaining);
+				console.log($(this).text());
+			}
+		});
+
+		console.log(timerHandle);
+
+		console.log("END INTERVAL");
+	}
+
+	/**
 	 * Callback Function invoked whenever a new train is added 
 	 * to Firebase.
 	 * 
@@ -108,28 +163,58 @@ $(document).ready(function(){
 		// Get the difference between current time and first ever time in minutes
 		diffInMinutes = now.diff(moment(firstTime),"minutes");
 
-		// Based on that, compute the minutes remaining until next arrival
+		// Based on that, compute the minutes remaining until next arrival, as well
+		// as the next arrival time in HH:mm
 		remainder  = diffInMinutes % trainObject.trainFrequency;
 		minutesRemaining = trainObject.trainFrequency - remainder;
-
-
 		console.log("Next train arrives in "+minutesRemaining+" minutes");
 
 		nextArrival = now.add(minutesRemaining,"minutes");
 		nextArrivalFormatted = nextArrival.format("HH:mm");
 		console.log("Next arrival at "+nextArrivalFormatted);
 
-		// Change the HTML to reflect
-		$("#train-schedule-table").append('<tr><td>'+ 
-																				 trainObject.trainName+'</td><td>'+
-																				 trainObject.trainDestination+'</td><td>'+
-																				 trainObject.trainFrequency+'</td><td>'+
-																				 nextArrivalFormatted+'</td><td>'+
-																				 minutesRemaining+'</td>');
+		// Update the train schedule table
+		var newRow = $("<tr>");
 
-		// Handle the errors
-	}, function(errorObject) {
-		console.log("Errors handled: " + errorObject.code);
+		trainNameCell = $("<td>");
+		trainNameCell.text(trainObject.trainName);
+
+		trainDestCell = $("<td>");
+		trainDestCell.text(trainObject.trainDestination);
+
+		trainFreqCell = $("<td>");
+		trainFreqCell.text(trainObject.trainFrequency);
+		trainFreqCell.addClass("frequency-cell");
+
+		nextArrivalCell = $("<td>");
+		nextArrivalCell.text(nextArrivalFormatted);
+		nextArrivalCell.addClass("next-arrival-cell");
+
+		minsRemCell = $("<td>");
+		minsRemCell.text(minutesRemaining);
+		minsRemCell.addClass("minutes-remaining-cell");
+
+		newRow.append(trainNameCell); 
+		newRow.append(trainDestCell); 
+		newRow.append(trainFreqCell);
+		newRow.append(nextArrivalCell);
+		newRow.append(minsRemCell);
+
+		$("#train-schedule-table").append(newRow);
+
+		// Setup a periodic refresh function that updates the 
+		// 'minutes remaining' in the train schedules.
+
+		// Only needs to be done ONCE i.e. the FIRST time the 
+		// Firebase callback gets invoked 
+		if(!timerRunning){
+			timerHandle = setInterval(refreshTimeRemaining, 1000);
+			console.log(timerHandle);
+			timerRunning = true;
+		}
+
+	}, function(errorObject) {// Error Handler
+		console.log("Error reaching database -  " + errorObject.code);
 	});
 
 });
